@@ -3,6 +3,8 @@ import subprocess
 from os import unlink
 from os import name as osname
 from os.path import isfile, isdir
+import os.path as op
+import sys
 import logging
 from hashlib import sha1
 from shutil import copyfile, rmtree
@@ -191,6 +193,18 @@ class BootPatcher(object):
             if sha != "":
                 config.write(f"SHA1={sha}\n")
 
+        # Find local prop.default file
+        local_prop = "prop.default"
+        if not isfile(local_prop):
+            local_prop = op.join(op.dirname(sys.argv[0]), "prop.default")
+
+        prop_patched = False
+        if self.patch_adb and isfile(local_prop):
+            print("Replacing prop.default inside boot with local prop.default...", file=self.log)
+            # Copy to current working directory to avoid path/space issues with magiskboot argument parsing
+            cp(local_prop, "prop.default_patch")
+            prop_patched = True
+
         cpio_cmds = [
             "cpio", "ramdisk.cpio",
             f"add 0750 {init} magiskinit",
@@ -199,6 +213,9 @@ class BootPatcher(object):
             f"{skip32} add 0644 overlay.d/sbin/magisk32.xz magisk32.xz",
             f"{skip64} add 0644 overlay.d/sbin/magisk64.xz magisk64.xz",
         ]
+
+        if prop_patched:
+            cpio_cmds.append("add 0644 prop.default prop.default_patch")
 
         if self.patch_adb and isfile("init.custom.rc"):
             print(langget('injecting init.custom.rc'), file=self.log)
@@ -218,7 +235,7 @@ class BootPatcher(object):
             print(langget('unable to patch ramdisk'), file=self.log)
             return False
         
-        rm("ramdisk.cpio.orig", "config", "magisk32.xz", "magisk64.xz", "stub.xz")
+        rm("ramdisk.cpio.orig", "config", "magisk32.xz", "magisk64.xz", "stub.xz", "prop.default_patch")
         
         for dt in "dtb", "kernel_dtb", "extra":
             if isfile(dt):
@@ -270,7 +287,7 @@ class BootPatcher(object):
 
     def cleanup(self):
         rmlist = [
-        "magisk32", "magisk32.xz", "magisk64", "magisk64.xz", "magiskinit", "stub.apk"
+        "magisk32", "magisk32.xz", "magisk64", "magisk64.xz", "magiskinit", "stub.apk", "prop.default_patch"
         ]
         rm(*rmlist)
         print(langget('cleanup'), file=self.log)
