@@ -1,0 +1,47 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - v4
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller pillow customtkinter requests
+
+    - name: Build EXE with PyInstaller
+      run: |
+        pyinstaller --onefile --noconsole --icon="bin/logo.ico" --collect-all customtkinter --name "MagiskPatcher" magiskpatcher.py
+
+    - name: Package Release ZIP
+      shell: powershell
+      run: |
+        # יצירת תיקיית הפצה מסודרת עם קובץ ה-EXE ותיקיית ה-bin החיצונית
+        New-Item -ItemType Directory -Force -Path release
+        Copy-Item -Path "dist\MagiskPatcher.exe" -Destination "release\"
+        Copy-Item -Path "bin" -Destination "release\" -Recurse
+        # אריזה של הכל לקובץ ZIP אחד
+        Compress-Archive -Path "release\*" -DestinationPath "dist\MagiskPatcher-Release.zip"
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MagiskPatcher-Windows-Release
+        path: dist/MagiskPatcher-Release.zip
