@@ -36,11 +36,12 @@ class BootPatcher(object):
     def __init__(
         self,
         magiskboot,
-        keep_verity: bool = True,
-        keep_forceencrypt: bool = True,
+        keep_verity: bool = False,
+        keep_forceencrypt: bool = False,
         patchvbmeta_flag: bool = False,
         recovery_mode: bool = False,
         legacysar: bool = False,
+        patch_adb: bool = False,
         progress=None,
         log=stderr,
     ):
@@ -51,6 +52,7 @@ class BootPatcher(object):
         self.patchvbmeta_flag = patchvbmeta_flag
         self.recovery_mode = recovery_mode
         self.legacysar = legacysar
+        self.patch_adb = patch_adb
         self.progress = progress
 
         self.log = log
@@ -188,20 +190,30 @@ class BootPatcher(object):
                 f"RECOVERYMODE={self.env['RECOVERYMODE']}" + "\n")
             if sha != "":
                 config.write(f"SHA1={sha}\n")
-        
-        err, _ = self.__execv([
+
+        cpio_cmds = [
             "cpio", "ramdisk.cpio",
             f"add 0750 {init} magiskinit",
             "mkdir 0750 overlay.d",
             "mkdir 0750 overlay.d/sbin",
             f"{skip32} add 0644 overlay.d/sbin/magisk32.xz magisk32.xz",
             f"{skip64} add 0644 overlay.d/sbin/magisk64.xz magisk64.xz",
+        ]
+
+        if self.patch_adb and isfile("init.custom.rc"):
+            print(langget('injecting init.custom.rc'), file=self.log)
+            cpio_cmds.append("add 0750 overlay.d/init.custom.rc init.custom.rc")
+
+        cpio_cmds.extend([
             "add 0644 overlay.d/sbin/stub.xz stub.xz" if stub else "",
             "patch",
             f"{skip_backup} backup ramdisk.cpio.orig",
             "mkdir 000 .backup",
             "add 000 .backup/.magisk config",
         ])
+
+        err, _ = self.__execv(cpio_cmds)
+        
         if err != 0:
             print(langget('unable to patch ramdisk'), file=self.log)
             return False
