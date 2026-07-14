@@ -29,8 +29,8 @@ else:
 VERSION = "4.1.0"
 AUTHOR = "affggh"
 TITLE = "Magisk Patcher v%s by %s" % (VERSION, AUTHOR)
-WIDTH = 900
-HEIGHT = 420
+WIDTH = 960
+HEIGHT = 460
 OS, REL, ARCH = utils.retTypeAndMachine()
 LICENSE = "GPLv3"
 INTRODUCE = """\
@@ -73,14 +73,20 @@ class MagiskPatcherUI(ctk.CTk):
         self.logo = ctk.CTkImage(Image.open(BytesIO(logodata), "r"), size=(240, 100))
         self.bootimg = ctk.StringVar()
         self.arch = ctk.StringVar()
-        self.magisk_select = ctk.StringVar(value=self.langget('magisk is not select'))
-        self.magisk_select_int = ctk.StringVar()
+        
+        if op.isfile("Magisk.apk"):
+            self.magisk_select = ctk.StringVar(value=f"- {self.langget('current magisk')} [Magisk.apk]")
+        else:
+            self.magisk_select = ctk.StringVar(value=self.langget('magisk is not select'))
+            
+        self.magisk_select_int = ctk.StringVar(value="Magisk.apk")
 
-        self.keep_verity = ctk.BooleanVar(value=True)
-        self.keep_forceencrypt = ctk.BooleanVar(value=True)
+        self.keep_verity = ctk.BooleanVar(value=False)
+        self.keep_forceencrypt = ctk.BooleanVar(value=False)
         self.patchvbmeta_flag = ctk.BooleanVar(value=False)
         self.recoverymode = ctk.BooleanVar(value=False)
         self.legacysar = ctk.BooleanVar(value=False)
+        self.patch_adb = ctk.BooleanVar(value=False)
 
         self.progress = ctk.DoubleVar(value=0)
         self.loglevel = ctk.IntVar(value=logging.WARNING)
@@ -269,6 +275,9 @@ class MagiskPatcherUI(ctk.CTk):
         legacy_sar_flag = ctk.CTkSwitch(config_frame, text=self.langget('legacy sar'), variable=self.legacysar)
         legacy_sar_flag.grid(column=1, row=2, sticky='nsew', padx=5, pady=5, columnspan=4)
 
+        patch_adb_flag = ctk.CTkSwitch(config_frame, text="Patch ADB", variable=self.patch_adb)
+        patch_adb_flag.grid(column=1, row=3, sticky='nsew', padx=5, pady=5, columnspan=4)
+
         config_frame.pack(side="top", fill="x", expand="no", padx=5, pady=5)
 
         confirm_frame = ctk.CTkFrame(self.patcher_frame, corner_radius=5)
@@ -391,14 +400,21 @@ class MagiskPatcherUI(ctk.CTk):
             print(self.langget('please select a exist boot image'), file=self)
             return
         
-        if not op.isfile(op.join("prebuilt", self.magisk_select_int.get())):
-            print(self.langget('please select a valid magisk apk'), file=self)
-            return
+        apk_path = self.magisk_select_int.get()
+        if not op.isfile(apk_path):
+            apk_path = op.join("prebuilt", self.magisk_select_int.get())
+            
+        if not op.isfile(apk_path):
+            if op.isfile("Magisk.apk"):
+                apk_path = "Magisk.apk"
+            else:
+                print(self.langget('please select a valid magisk apk'), file=self)
+                return
 
-        magisk_version = utils.getMagiskApkVersion(op.join("prebuilt", self.magisk_select_int.get()))
+        magisk_version = utils.getMagiskApkVersion(apk_path)
         print(f"{self.langget('detect select magisk version is')} [{str(utils.convertVercode2Ver(magisk_version))}]", file=self)
 
-        utils.parseMagiskApk(op.join("prebuilt", self.magisk_select_int.get()), arch=self.arch.get(), log=self)
+        utils.parseMagiskApk(apk_path, arch=self.arch.get(), log=self)
 
         patcher = boot_patch.BootPatcher(prebuilt_magiskboot,
                                          self.keep_verity.get(),
@@ -406,6 +422,7 @@ class MagiskPatcherUI(ctk.CTk):
                                          self.patchvbmeta_flag.get(),
                                          self.recoverymode.get(),
                                          self.legacysar.get(),
+                                         self.patch_adb.get(),
                                          self.progress,
                                          self)
         th = DummyProcess(target=patcher.patch, args=[self.bootimg.get(),])
@@ -565,7 +582,11 @@ class MagiskPatcherUI(ctk.CTk):
         
         Language.select = self.lang.get()
         self.lang_dict = getattr(Language, self.lang.get())
-        self.magisk_select.set(self.langget('magisk is not select'))
+        if op.isfile("Magisk.apk"):
+            self.magisk_select.set(f"- {self.langget('current magisk')} [Magisk.apk]")
+        else:
+            self.magisk_select.set(self.langget('magisk is not select'))
+            
         for i in self.magisk_list:
             i.destory()
         self.magisk_list = []
@@ -575,7 +596,12 @@ def centerWindow(parent: ctk.CTk):
     width, height = parent.winfo_screenwidth(), parent.winfo_screenheight()
     parent.geometry("+%d+%d" % ((width / 2) - (WIDTH / 2), (height / 2) - (HEIGHT / 2)))
 
-if __name__ == "__main__":
+# For pyinstaller
+try:
+    from mp import splash
+except: pass
+
+if __name__ == '__main__':
     root = MagiskPatcherUI()
     root.title(TITLE)
     root.geometry("%dx%d" % (WIDTH, HEIGHT))
