@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Language:
-    supports = ['zh_CN', 'en_US']
+    supports = ['en_US', 'zh_CN']
     select = supports[0]
     zh_CN = {
         'Home': "主页",
@@ -76,9 +76,7 @@ class Language:
         'faild to repack boot image': "- 打包boot镜像失败",
         'done': "- 完成！",
         'cleanup': "- 清理文件",
-
-
-
+        'injecting init.custom.rc': "- 正在注入 init.custom.rc",
 
     }
     en_US = {
@@ -153,6 +151,7 @@ class Language:
         'faild to repack boot image': "- Unable to repack boot image",
         'done': "- Done !",
         'cleanup': "- Cleanup...",
+        'injecting init.custom.rc': "- Injecting init.custom.rc",
     }
 
 def langget(key) -> str:
